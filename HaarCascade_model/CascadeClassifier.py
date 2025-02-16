@@ -4,32 +4,30 @@ import numpy as np
 import cv2
 from datetime import datetime
 import json
-import pickle
-from collections import Counter
 import logging
+from collections import Counter
 
 class EnhancedFaceRecognition:
     def __init__(self):
         # Initialize cascade classifiers for face and eyes
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-        
+
         # Recognition parameters
         self.known_face_encodings = []
         self.known_face_names = []
         self.recognition_threshold = 0.8
         self.confidence_frames = 5
-        self.face_memory = {}
-        
+
         # Attendance tracking
         self.attendance_log = {}
         self.attendance_file = "attendance_log.json"
         self.load_attendance_log()
-        
+
         # Setup logging
         logging.basicConfig(filename='face_recognition.log', level=logging.INFO,
-                          format='%(asctime)s:%(levelname)s:%(message)s')
-        
+                            format='%(asctime)s:%(levelname)s:%(message)s')
+
         # Load or create faces directory
         self.faces_dir = 'faces'
         self.ensure_directories()
@@ -60,63 +58,20 @@ class EnhancedFaceRecognition:
             logging.error(f"Error saving attendance log: {e}")
 
     def extract_face_features(self, face_roi):
-        """Extract multiple features from face ROI."""
+        """Extract histogram features from face ROI."""
         try:
             # Resize for consistency
             face_roi = cv2.resize(face_roi, (100, 100))
-            
             # Calculate histogram features
             hist = cv2.calcHist([face_roi], [0], None, [256], [0, 256])
             cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-            
-            # Calculate LBP features
-            lbp = self.local_binary_pattern(face_roi)
-            
-            # Combine features
-            features = np.concatenate([hist.flatten(), lbp.flatten()])
-            return features
-            
+            return hist.flatten()
         except Exception as e:
             logging.error(f"Error extracting face features: {e}")
             return None
 
-    def local_binary_pattern(self, image, points=8, radius=1):
-        """Calculate Local Binary Pattern features."""
-        neighbors = self._get_neighbors(image, points, radius)
-        center = image[radius:-radius, radius:-radius]
-        pattern = np.zeros_like(center)
-        
-        for i in range(points):
-            pattern += (neighbors[i] >= center) * (1 << i)
-            
-        return pattern
-
-    def _get_neighbors(self, image, points, radius):
-        """Get circular neighbor values for LBP calculation."""
-        rows, cols = image.shape
-        neighbors = []
-        
-        for i in range(points):
-            angle = 2 * np.pi * i / points
-            x = radius * np.cos(angle)
-            y = -radius * np.sin(angle)
-            
-            # Bilinear interpolation
-            x1, y1 = int(np.floor(x)), int(np.floor(y))
-            x2, y2 = x1 + 1, y1 + 1
-            
-            fx, fy = x - x1, y - y1
-            
-            n = image[radius:-radius, radius:-radius]
-            neighbors.append((1 - fx) * (1 - fy) * n +
-                           fx * (1 - fy) * np.roll(n, 1, axis=1) +
-                           (1 - fx) * fy * np.roll(n, 1, axis=0) +
-                           fx * fy * np.roll(np.roll(n, 1, axis=0), 1, axis=1))
-            
-        return neighbors
-
     def encode_faces(self):
-        """Enhanced face encoding with multiple features."""
+        """Encode known faces using histogram features."""
         if not os.path.exists(self.faces_dir):
             logging.error("Faces directory not found")
             sys.exit(1)
@@ -126,7 +81,7 @@ class EnhancedFaceRecognition:
                 # Load and preprocess image
                 image_path = os.path.join(self.faces_dir, image_file)
                 face_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-                
+
                 if face_image is None:
                     logging.warning(f"Could not load image {image_file}")
                     continue
@@ -138,8 +93,7 @@ class EnhancedFaceRecognition:
                     continue
 
                 # Get largest face
-                face = max(faces, key=lambda f: f[2] * f[3])
-                x, y, w, h = face
+                (x, y, w, h) = max(faces, key=lambda f: f[2] * f[3])
                 face_roi = face_image[y:y+h, x:x+w]
 
                 # Extract features
@@ -159,26 +113,12 @@ class EnhancedFaceRecognition:
         return len(eyes) >= 2
 
     def compare_faces(self, face_encoding):
-        """Compare face encoding with known faces using multiple metrics."""
+        """Compare face encoding with known faces using histogram correlation."""
         if len(self.known_face_encodings) == 0:
             return "Unknown", 0
 
-        similarities = []
-        for known_encoding in self.known_face_encodings:
-            # Calculate histogram correlation
-            hist_corr = cv2.compareHist(
-                face_encoding[:256].reshape(-256, 1),
-                known_encoding[:256].reshape(-256, 1),
-                cv2.HISTCMP_CORREL
-            )
-            
-            # Calculate LBP feature similarity
-            lbp_sim = 1 - (np.sum(np.abs(face_encoding[256:] - known_encoding[256:])) /
-                          len(face_encoding[256:]))
-            
-            # Combine similarities
-            similarity = 0.6 * hist_corr + 0.4 * lbp_sim
-            similarities.append(similarity)
+        similarities = [cv2.compareHist(face_encoding, known_encoding, cv2.HISTCMP_CORREL)
+                        for known_encoding in self.known_face_encodings]
 
         best_match_idx = np.argmax(similarities)
         best_score = similarities[best_match_idx]
@@ -192,10 +132,10 @@ class EnhancedFaceRecognition:
         if name != "Unknown":
             current_date = datetime.now().strftime("%Y-%m-%d")
             current_time = datetime.now().strftime("%H:%M:%S")
-            
+
             if current_date not in self.attendance_log:
                 self.attendance_log[current_date] = {}
-            
+
             if name not in self.attendance_log[current_date]:
                 self.attendance_log[current_date][name] = {
                     "first_seen": current_time,
@@ -204,7 +144,7 @@ class EnhancedFaceRecognition:
                 logging.info(f"Marked attendance for {name}")
             else:
                 self.attendance_log[current_date][name]["last_seen"] = current_time
-            
+
             self.save_attendance_log()
 
     def run_recognition(self):
@@ -233,7 +173,7 @@ class EnhancedFaceRecognition:
 
             for (x, y, w, h) in faces:
                 face_roi = gray[y:y+h, x:x+w]
-                
+
                 # Verify face
                 if not self.verify_face(frame, face_roi):
                     continue
@@ -244,18 +184,18 @@ class EnhancedFaceRecognition:
                     continue
 
                 name, confidence = self.compare_faces(features)
-                
+
                 # Use temporal consistency
                 face_buffer.append(name)
                 if len(face_buffer) > self.confidence_frames:
                     face_buffer.pop(0)
-                
+
                 if len(face_buffer) == self.confidence_frames:
                     final_name = Counter(face_buffer).most_common(1)[0][0]
-                    
+
                     # Update attendance
                     self.update_attendance(final_name)
-                    
+
                     # Draw results
                     color = (0, 255, 0) if final_name != "Unknown" else (0, 0, 255)
                     cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
