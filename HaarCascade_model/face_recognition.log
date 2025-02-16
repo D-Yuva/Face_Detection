@@ -93,3 +93,14 @@
 2025-02-15 23:27:34,848:ERROR:Error extracting face features: Cannot cast ufunc 'add' output from dtype('int64') to dtype('uint8') with casting rule 'same_kind'
 2025-02-15 23:27:35,250:ERROR:Error extracting face features: Cannot cast ufunc 'add' output from dtype('int64') to dtype('uint8') with casting rule 'same_kind'
 2025-02-15 23:29:26,871:INFO:Loaded 1 faces: ['yuva']
+2025-02-16 11:58:40,760:INFO:Loaded 1 faces: ['yuva']
+2025-02-16 11:58:43,236:WARNING:Frame capture failed
+2025-02-16 11:59:13,174:WARNING:Frame capture failed
+2025-02-16 11:59:14,177:WARNING:Frame capture failed
+2025-02-16 11:59:15,178:WARNING:Frame capture failed
+2025-02-16 11:59:16,180:WARNING:Frame capture failed
+2025-02-16 11:59:17,181:WARNING:Frame capture failed
+2025-02-16 11:59:18,182:WARNING:Frame capture failed
+2025-02-16 11:59:19,183:WARNING:Frame capture failed
+2025-02-16 11:59:20,185:WARNING:Frame capture failed
+2025-02-16 11:59:26,302:INFO:Loaded 1 faces: ['yuva']
