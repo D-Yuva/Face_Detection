@@ -12,10 +12,10 @@ class EnhancedFaceRecognition:
         # Initialize cascade classifiers
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         eye_cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
-        
+
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
         self.eye_cascade = cv2.CascadeClassifier(eye_cascade_path)
-        
+
         # Check if cascade files loaded properly
         if self.face_cascade.empty():
             print(f"Error: Couldn't load face cascade from {cascade_path}")
@@ -23,13 +23,13 @@ class EnhancedFaceRecognition:
         if self.eye_cascade.empty():
             print(f"Error: Couldn't load eye cascade from {eye_cascade_path}")
             sys.exit(1)
-            
+
         print("Cascade classifiers loaded successfully")
 
         # Recognition parameters
         self.known_face_encodings = []
         self.known_face_names = []
-        self.recognition_threshold = 0.5  # Threshold
+        self.recognition_threshold = 0.4  # Lowered threshold
 
         # Setup directories and load faces
         self.faces_dir = 'faces'
@@ -47,11 +47,11 @@ class EnhancedFaceRecognition:
         try:
             # Resize for consistency
             face_roi = cv2.resize(face_roi, (100, 100))
-            
+
             # Calculate histogram features
             hist = cv2.calcHist([face_roi], [0], None, [256], [0, 256])
             cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-            
+
             return hist.flatten()
         except Exception as e:
             print(f"Feature extraction error: {e}")
@@ -75,12 +75,12 @@ class EnhancedFaceRecognition:
                 # Load and preprocess image
                 image_path = os.path.join(self.faces_dir, image_file)
                 print(f"Processing {image_path}")
-                
+
                 face_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
                 if face_image is None:
                     print(f"Could not load image {image_file}")
                     continue
-                
+
                 print(f"Image shape: {face_image.shape}")
 
                 # Detect faces
@@ -90,7 +90,7 @@ class EnhancedFaceRecognition:
                     minNeighbors=5,
                     minSize=(30, 30)
                 )
-                
+
                 print(f"Found {len(faces)} faces in {image_file}")
 
                 if len(faces) == 0:
@@ -100,9 +100,9 @@ class EnhancedFaceRecognition:
                 # Get largest face
                 (x, y, w, h) = max(faces, key=lambda f: f[2] * f[3])
                 print(f"Selected face region: x={x}, y={y}, w={w}, h={h}")
-                
+
                 face_roi = face_image[y:y+h, x:x+w]
-                
+
                 # Extract features
                 features = self.extract_face_features(face_roi)
                 if features is not None:
@@ -134,7 +134,7 @@ class EnhancedFaceRecognition:
 
         best_match_idx = np.argmax(similarities)
         best_score = similarities[best_match_idx]
-        
+
         print(f"Best match: {self.known_face_names[best_match_idx]} with score {best_score:.3f}")
 
         if best_score > self.recognition_threshold:
@@ -145,7 +145,7 @@ class EnhancedFaceRecognition:
         """Run face recognition with enhanced features."""
         print("Initializing camera...")
         video_capture = cv2.VideoCapture(0)
-        
+
         if not video_capture.isOpened():
             print("Error: Could not access camera")
             sys.exit(1)
@@ -159,7 +159,7 @@ class EnhancedFaceRecognition:
                 continue
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            
+
             # Detect faces
             faces = self.face_cascade.detectMultiScale(
                 gray,
@@ -167,26 +167,26 @@ class EnhancedFaceRecognition:
                 minNeighbors=5,
                 minSize=(30, 30)
             )
-            
+
             print(f"Detected faces: {len(faces)}")  # Debug print
 
             for (x, y, w, h) in faces:
                 # Draw rectangle immediately
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-                
+
                 face_roi = gray[y:y+h, x:x+w]
-                
+
                 # Extract and compare features
                 features = self.extract_face_features(face_roi)
                 if features is None:
                     continue
 
                 name, confidence = self.compare_faces(features)
-                
+
                 # Draw name and confidence
                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                 label = f"{name} ({confidence:.2f})"
-                cv2.putText(frame, label, (x, y-10), 
+                cv2.putText(frame, label, (x, y-10),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
             cv2.imshow('Face Recognition', frame)
