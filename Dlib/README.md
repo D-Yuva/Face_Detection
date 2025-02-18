@@ -26,22 +26,8 @@ You'll also need the following model files in the data/data_dlib/ directory:
 
 ## Project Structure
 
-├── attendance_tracker.py
+![Screenshot 2025-02-18 at 12 13 01 PM](https://github.com/user-attachments/assets/e4c5bd27-1022-4340-b253-d9186b56276b)
 
-├── feature_extraction_to_csv.py
-
-├── data/
-
-│   ├── data_dlib/
-
-│   │   ├── shape_predictor_68_face_landmarks.dat
-
-│   │   └── dlib_face_recognition_resnet_model_v1.dat
-
-│   └── features_all.csv
-
-└── faces/
-    └── [person_name].jpg
 
 ## Setup Instructions
 
