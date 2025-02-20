@@ -31,7 +31,7 @@ cursor.execute(create_table_sql)
 conn.commit()
 conn.close()
 
-class Face_Recognizer:
+class FaceRecognizer:
     def __init__(self):
         self.font = cv2.FONT_ITALIC
 
@@ -63,7 +63,7 @@ class Face_Recognizer:
         self.current_frame_face_cnt = 0
 
         # Save the e-distance for faceX when recognizing
-        self.current_frame_face_X_e_distance_list = []
+        self.eDistanceX = []
 
         # Save the positions and names of current faces captured
         self.current_frame_face_position_list = []
@@ -173,12 +173,14 @@ class Face_Recognizer:
 
     # Face detection and recognition with OT from input video stream
     def process(self, stream):
-        # 1. Get faces known from "features.all.csv"
+    # 1. Get faces known from "features.all.csv"
         if self.get_face_database():
             while stream.isOpened():
                 self.frame_cnt += 1
                 logging.debug("Frame " + str(self.frame_cnt) + " starts")
-                flag, img_rd = stream.read()
+                ret, img_rd = stream.read()  # Extract the image array from the tuple
+                if not ret:
+                    break
                 kk = cv2.waitKey(1)
 
                 # 2. Detect faces for frame X
@@ -233,7 +235,7 @@ class Face_Recognizer:
                 else:
                     logging.debug("scene 2: Faces cnt changes in this frame")
                     self.current_frame_face_position_list = []
-                    self.current_frame_face_X_e_distance_list = []
+                    self.eDistanceX = []
                     self.current_frame_face_feature_list = []
                     self.reclassify_interval_cnt = 0
 
@@ -259,7 +261,7 @@ class Face_Recognizer:
                                 [int(faces[k].left() + faces[k].right()) / 2,
                                  int(faces[k].top() + faces[k].bottom()) / 2])
 
-                            self.current_frame_face_X_e_distance_list = []
+                            self.eDistanceX = []
 
                             # 6.2.2.2 Positions of faces captured
                             self.current_frame_face_position_list.append(tuple(
@@ -272,15 +274,15 @@ class Face_Recognizer:
                                         self.current_frame_face_feature_list[k],
                                         self.face_features_known_list[i])
                                     logging.debug(" with person %d, the e-distance: %f", i + 1, e_distance_tmp)
-                                    self.current_frame_face_X_e_distance_list.append(e_distance_tmp)
+                                    self.eDistanceX.append(e_distance_tmp)
                                 else:
-                                    self.current_frame_face_X_e_distance_list.append(999999999)
+                                    self.eDistanceX.append(999999999)
 
                             # 6.2.2.4 Find the one with minimum e distance
-                            similar_person_num = self.current_frame_face_X_e_distance_list.index(
-                                min(self.current_frame_face_X_e_distance_list))
+                            similar_person_num = self.eDistanceX.index(
+                                min(self.eDistanceX))
 
-                            if min(self.current_frame_face_X_e_distance_list) < 0.6:
+                            if min(self.eDistanceX) < 0.6:
                                 self.current_frame_face_name_list[k] = self.face_name_known_list[similar_person_num]
                                 logging.debug(" Face recognition result: %s",
                                               self.face_name_known_list[similar_person_num])
@@ -305,7 +307,6 @@ class Face_Recognizer:
                 logging.debug("Frame ends\n\n")
 
     def run(self):
-        # cap = cv2.VideoCapture("video.mp4")  # Get video stream from video file
         cap = cv2.VideoCapture(0)  # Get video stream from camera
         self.process(cap)
 
@@ -314,8 +315,8 @@ class Face_Recognizer:
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    Face_Recognizer_con = Face_Recognizer()
-    Face_Recognizer_con.run()
+    FaceRecognizerCon = FaceRecognizer()
+    FaceRecognizerCon.run()
 
 if __name__ == '__main__':
     main()

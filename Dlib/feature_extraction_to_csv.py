@@ -34,20 +34,20 @@ def return_128d_features(path_img):
     return face_descriptor
 
 # Return the mean value of 128D face descriptor for person X
-def return_features_mean_personX(path_face_personX):
-    features_list_personX = []
+def returnFeatureMeanPersonX(path_face_personX):
+    featuresListPersonX = []
     # Directly use the image path
     logging.info("%-40s %-20s", " / Reading image:", path_face_personX)
     features_128d = return_128d_features(path_face_personX)
     # Jump if no face detected from image
     if features_128d != 0:
-        features_list_personX.append(features_128d)
+        featuresListPersonX.append(features_128d)
 
-    if features_list_personX:
-        features_mean_personX = np.array(features_list_personX, dtype=object).mean(axis=0)
+    if featuresListPersonX:
+        featuresMeanPersonX = np.array(featuresListPersonX, dtype=object).mean(axis=0)
     else:
-        features_mean_personX = np.zeros(128, dtype=object, order='C')
-    return features_mean_personX
+        featuresMeanPersonX = np.zeros(128, dtype=object, order='C')
+    return featuresMeanPersonX
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -62,12 +62,12 @@ def main():
             image_path = os.path.join(path_images_from_camera, image_file)
 
             logging.info("Processing image: %s", image_path)
-            features_mean_personX = return_features_mean_personX(image_path)
+            featuresMeanPersonX = returnFeatureMeanPersonX(image_path)
 
             # Insert the name as the first element
-            features_mean_personX = np.insert(features_mean_personX, 0, person_name, axis=0)
-            # features_mean_personX will be 129D, person name + 128 features
-            writer.writerow(features_mean_personX)
+            featuresMeanPersonX = np.insert(featuresMeanPersonX, 0, person_name, axis=0)
+            # featuresMeanPersonX will be 129D, person name + 128 features
+            writer.writerow(featuresMeanPersonX)
             logging.info('\n')
         logging.info("Save all the features of faces registered into: data/features_all.csv")
 
