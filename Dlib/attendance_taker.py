@@ -8,21 +8,25 @@ import logging
 import sqlite3
 import datetime
 
-# Dlib / Use frontal face detector of Dlib
+"""DLIB MODELS"""
+
+# Dlib's frontal face detector 
 detector = dlib.get_frontal_face_detector()
 
-# Dlib landmark / Get face landmarks
+# Dlib's shape predictor, draws points on the face
 predictor = dlib.shape_predictor('/Users/yuva/development/Face_Recogonition/Dlib/data/data_dlib/shape_predictor_68_face_landmarks.dat')
 
-# Dlib Resnet Use Dlib resnet50 model to get 128D face descriptor
+# Using Resnet to get the 128D vector
 face_reco_model = dlib.face_recognition_model_v1("/Users/yuva/development/Face_Recogonition/Dlib/data/data_dlib/dlib_face_recognition_resnet_model_v1.dat")
 
-# Create a connection to the database
+"""DATABASE SETUP"""
+
+# Create a connection to the sql database
 conn = sqlite3.connect("attendance.db")
 cursor = conn.cursor()
 
 # Create a table for the current date
-current_date = datetime.datetime.now().strftime("%Y_%m_%d")  # Replace hyphens with underscores
+current_date = datetime.datetime.now().strftime("%Y_%m_%d") 
 table_name = "attendance"
 create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} (name TEXT, time TEXT, date DATE, UNIQUE(name, date))"
 cursor.execute(create_table_sql)
@@ -77,7 +81,7 @@ class FaceRecognizer:
         self.reclassify_interval_cnt = 0
         self.reclassify_interval = 10
 
-    # "features_all.csv" / Get known faces from "features_all.csv"
+    # Get known faces from features_all.csv
     def get_face_database(self):
         if os.path.exists("data/features_all.csv"):
             path_features_known_csv = "data/features_all.csv"
@@ -173,7 +177,7 @@ class FaceRecognizer:
 
     # Face detection and recognition with OT from input video stream
     def process(self, stream):
-    # 1. Get faces known from "features.all.csv"
+    # 1. Get faces known from "features_all.csv"
         if self.get_face_database():
             while stream.isOpened():
                 self.frame_cnt += 1
