@@ -286,7 +286,7 @@ class FaceRecognizer:
                             similar_person_num = self.eDistanceX.index(
                                 min(self.eDistanceX))
 
-                            if min(self.eDistanceX) < 0.6:
+                            if min(self.eDistanceX) <0.55:
                                 self.current_frame_face_name_list[k] = self.face_name_known_list[similar_person_num]
                                 logging.debug(" Face recognition result: %s",
                                               self.face_name_known_list[similar_person_num])
