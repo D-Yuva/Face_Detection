@@ -54,19 +54,24 @@ def main():
     # Get the list of image files in the 'faces' folder
     image_files = [f for f in os.listdir(path_images_from_camera) if f.endswith(('.png', '.jpg', '.jpeg'))]
 
+    # Create the directories if they don't exist
+    os.makedirs('data', exist_ok=True)
+    
     with open("data/features_all.csv", "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for image_file in image_files:
-            # Extract the person's name from the file name (assuming the format is "name_of_the_person.png")
-            person_name = os.path.splitext(image_file)[0]
+            # Keep the full identifier (Name_RegNumber) as stored in the filename
+            person_id = os.path.splitext(image_file)[0]
             image_path = os.path.join(path_images_from_camera, image_file)
 
             logging.info("Processing image: %s", image_path)
+            logging.info("Person ID: %s", person_id)
+            
             featuresMeanPersonX = returnFeatureMeanPersonX(image_path)
 
-            # Insert the name as the first element
-            featuresMeanPersonX = np.insert(featuresMeanPersonX, 0, person_name, axis=0)
-            # featuresMeanPersonX will be 129D, person name + 128 features
+            # Insert the full identifier as the first element
+            featuresMeanPersonX = np.insert(featuresMeanPersonX, 0, person_id, axis=0)
+            # featuresMeanPersonX will be 129D, person identifier + 128 features
             writer.writerow(featuresMeanPersonX)
             logging.info('\n')
         logging.info("Save all the features of faces registered into: data/features_all.csv")

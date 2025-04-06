@@ -23,9 +23,15 @@ face_reco_model = dlib.face_recognition_model_v1("data/data_dlib/dlib_face_recog
 conn = sqlite3.connect("attendance.db")
 cursor = conn.cursor()
 
-# Create a table for attendance
+# Create a table for attendance with name and registration number columns
 table_name = "attendance"
-create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} (name TEXT, time TEXT, date DATE, UNIQUE(name, date))"
+create_table_sql = f"""CREATE TABLE IF NOT EXISTS {table_name} (
+    name TEXT, 
+    registration_number TEXT,
+    time TEXT, 
+    date DATE, 
+    UNIQUE(registration_number, date)
+)"""
 cursor.execute(create_table_sql)
 
 # Commit changes and close the connection
@@ -49,6 +55,7 @@ class FaceRecognizer:
         # Database faces
         self.face_features_known_list = []
         self.face_name_known_list = []
+        self.face_reg_known_list = []  # New list to store registration numbers
 
         # Centroid tracking
         self.last_frame_face_centroid_list = []
@@ -57,6 +64,8 @@ class FaceRecognizer:
         # Name tracking
         self.last_frame_face_name_list = []
         self.current_frame_face_name_list = []
+        self.last_frame_face_reg_list = []         # New list for registration tracking
+        self.current_frame_face_reg_list = []      # New list for registration tracking
 
         # Face counts
         self.last_frame_face_cnt = 0
@@ -72,8 +81,8 @@ class FaceRecognizer:
         self.reclassify_interval_cnt = 0
         self.reclassify_interval = 10
         
-        # List to store recognized names for display
-        self.recognized_names = []
+        # List to store recognized people information for display
+        self.recognized_people = []  # Will store tuples of (name, reg_number)
 
     # Get known faces from features_all.csv
     def get_face_database(self):
@@ -82,7 +91,18 @@ class FaceRecognizer:
             csv_rd = pd.read_csv(path_features_known_csv, header=None)
             for i in range(csv_rd.shape[0]):
                 features_someone_arr = []
-                self.face_name_known_list.append(csv_rd.iloc[i][0])
+                
+                # Parse name and registration from format: Name_RegNumber
+                full_id = csv_rd.iloc[i][0]
+                if '_' in full_id:
+                    name, reg_number = full_id.split('_', 1)
+                else:
+                    name = full_id
+                    reg_number = "Unknown"
+                
+                self.face_name_known_list.append(name)
+                self.face_reg_known_list.append(reg_number)
+                
                 for j in range(1, 129):
                     if csv_rd.iloc[i][j] == '':
                         features_someone_arr.append('0')
@@ -128,6 +148,7 @@ class FaceRecognizer:
             last_frame_num = e_distance_current_frame_person_x_list.index(
                 min(e_distance_current_frame_person_x_list))
             self.current_frame_face_name_list[i] = self.last_frame_face_name_list[last_frame_num]
+            self.current_frame_face_reg_list[i] = self.last_frame_face_reg_list[last_frame_num]
 
     # Display information on the window without bounding boxes
     def draw_note(self, img_rd):
@@ -138,28 +159,31 @@ class FaceRecognizer:
         cv2.putText(img_rd, "Faces:  " + str(self.current_frame_face_cnt), (20, 160), self.font, 0.8, (0, 255, 0), 1, cv2.LINE_AA)
         cv2.putText(img_rd, "Q: Quit", (20, 450), self.font, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
         
-        # Display recognized names at the bottom of the screen
-        for i, name in enumerate(self.recognized_names):
+        # Display recognized people (name and registration number) at the bottom of the screen
+        for i, person in enumerate(self.recognized_people):
+            name, reg_number = person
             if name != "unknown":
-                # Display name at the bottom of the screen
-                cv2.putText(img_rd, f"Recognized: {name}", (20, 190 + i*30), self.font, 0.8, (0, 255, 255), 1, cv2.LINE_AA)
+                # Display name and registration number
+                cv2.putText(img_rd, f"Name: {name}", (20, 190 + i*60), self.font, 0.8, (0, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(img_rd, f"ID: {reg_number}", (20, 220 + i*60), self.font, 0.8, (0, 255, 255), 1, cv2.LINE_AA)
 
     # Insert data in database
-    def attendance(self, name):
+    def attendance(self, name, reg_number):
         current_date = datetime.datetime.now().strftime('%Y-%m-%d')
         conn = sqlite3.connect("attendance.db")
         cursor = conn.cursor()
-        # Check if the name already has an entry for the current date
-        cursor.execute("SELECT * FROM attendance WHERE name = ? AND date = ?", (name, current_date))
+        # Check if the registration number already has an entry for the current date
+        cursor.execute("SELECT * FROM attendance WHERE registration_number = ? AND date = ?", (reg_number, current_date))
         existing_entry = cursor.fetchone()
 
         if existing_entry:
-            print(f"{name} is already marked as present for {current_date}")
+            print(f"{name} ({reg_number}) is already marked as present for {current_date}")
         else:
             current_time = datetime.datetime.now().strftime('%H:%M:%S')
-            cursor.execute("INSERT INTO attendance (name, time, date) VALUES (?, ?, ?)", (name, current_time, current_date))
+            cursor.execute("INSERT INTO attendance (name, registration_number, time, date) VALUES (?, ?, ?, ?)", 
+                          (name, reg_number, current_time, current_date))
             conn.commit()
-            print(f"{name} marked as present for {current_date} at {current_time}")
+            print(f"{name} ({reg_number}) marked as present for {current_date} at {current_time}")
 
         conn.close()
 
@@ -184,13 +208,14 @@ class FaceRecognizer:
 
                 # 4. Update the face name list in last frame
                 self.last_frame_face_name_list = self.current_frame_face_name_list[:]
+                self.last_frame_face_reg_list = self.current_frame_face_reg_list[:]
 
                 # 5. update frame centroid list
                 self.last_frame_face_centroid_list = self.current_frame_face_centroid_list
                 self.current_frame_face_centroid_list = []
 
-                # Clear the recognized names list
-                self.recognized_names = []
+                # Clear the recognized people list
+                self.recognized_people = []
 
                 # 6.1 if cnt not changes
                 if (self.current_frame_face_cnt == self.last_frame_face_cnt) and (
@@ -216,9 +241,12 @@ class FaceRecognizer:
                         self.centroid_tracker()
 
                     # Add recognized names to our list
-                    for name in self.current_frame_face_name_list:
-                        if name != "unknown" and name not in self.recognized_names:
-                            self.recognized_names.append(name)
+                    for i, name in enumerate(self.current_frame_face_name_list):
+                        if name != "unknown":
+                            reg_number = self.current_frame_face_reg_list[i]
+                            person_info = (name, reg_number)
+                            if person_info not in self.recognized_people:
+                                self.recognized_people.append(person_info)
                             
                     self.draw_note(img_rd)
 
@@ -235,15 +263,18 @@ class FaceRecognizer:
                         logging.debug(" No faces in this frame!!!")
                         # clear list of names and features
                         self.current_frame_face_name_list = []
+                        self.current_frame_face_reg_list = []
                     # 6.2.2 Face cnt increase: 0->1, 0->2, ..., 1->2, ...
                     else:
                         logging.debug(" scene 2.2 Get faces in this frame and do face recognition")
                         self.current_frame_face_name_list = []
+                        self.current_frame_face_reg_list = []
                         for i in range(len(faces)):
                             shape = predictor(img_rd, faces[i])
                             self.current_frame_face_feature_list.append(
                                 face_reco_model.compute_face_descriptor(img_rd, shape))
                             self.current_frame_face_name_list.append("unknown")
+                            self.current_frame_face_reg_list.append("unknown")
 
                         # 6.2.2.1 Traverse all the faces in the database
                         for k in range(len(faces)):
@@ -275,20 +306,25 @@ class FaceRecognizer:
 
                             if min(self.eDistanceX) < 0.55:
                                 self.current_frame_face_name_list[k] = self.face_name_known_list[similar_person_num]
-                                logging.debug(" Face recognition result: %s",
-                                              self.face_name_known_list[similar_person_num])
+                                self.current_frame_face_reg_list[k] = self.face_reg_known_list[similar_person_num]
                                 
-                                # Add to recognized names list if not already there
+                                logging.debug(" Face recognition result: %s (%s)",
+                                              self.face_name_known_list[similar_person_num],
+                                              self.face_reg_known_list[similar_person_num])
+                                
+                                # Add to recognized people list if not already there
                                 name = self.face_name_known_list[similar_person_num]
-                                if name not in self.recognized_names:
-                                    self.recognized_names.append(name)
+                                reg_number = self.face_reg_known_list[similar_person_num]
+                                person_info = (name, reg_number)
+                                if person_info not in self.recognized_people:
+                                    self.recognized_people.append(person_info)
 
                                 # Insert attendance record
-                                self.attendance(name)
+                                self.attendance(name, reg_number)
                             else:
                                 logging.debug(" Face recognition result: Unknown person")
 
-                        # Draw note with recognized names
+                        # Draw note with recognized people
                         self.draw_note(img_rd)
 
                 self.update_fps()
